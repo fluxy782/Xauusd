@@ -5,6 +5,7 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 function TradingJournal() {
   const [trades, setTrades] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [selectedTrade, setSelectedTrade] = useState(null);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     entryTime: '00:00',
@@ -15,7 +16,9 @@ function TradingJournal() {
     takeProfit: '',
     type: 'LONG',
     lotSize: '',
-    reason: ''
+    profit: '',
+    reason: '',
+    screenshot: null
   });
 
   // Load trades from localStorage
@@ -29,23 +32,33 @@ function TradingJournal() {
     localStorage.setItem('xauusdTrades', JSON.stringify(trades));
   }, [trades]);
 
+  const handleScreenshot = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({...formData, screenshot: reader.result});
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const addTrade = (e) => {
     e.preventDefault();
-    if (!formData.entryPrice || !formData.exitPrice || !formData.lotSize) return;
+    if (!formData.entryPrice || !formData.exitPrice || !formData.profit) return;
 
     const entryPrice = parseFloat(formData.entryPrice);
     const exitPrice = parseFloat(formData.exitPrice);
     const pips = Math.abs(exitPrice - entryPrice) * 10;
-    const profit = formData.type === 'LONG' 
-      ? (exitPrice - entryPrice) * parseFloat(formData.lotSize) * 100
-      : (entryPrice - exitPrice) * parseFloat(formData.lotSize) * 100;
+    const profit = parseFloat(formData.profit);
+    const roi = formData.lotSize ? Math.round((profit / (parseFloat(formData.lotSize) * 1000)) * 10000) / 100 : 0;
 
     const newTrade = {
       id: Date.now(),
       ...formData,
-      pips: Math.round(pips * 10) / 10,
       profit: Math.round(profit * 100) / 100,
-      roi: formData.lotSize ? Math.round((profit / (parseFloat(formData.lotSize) * 1000)) * 10000) / 100 : 0
+      pips: Math.round(pips * 10) / 10,
+      roi: roi
     };
 
     setTrades([...trades, newTrade]);
@@ -59,7 +72,9 @@ function TradingJournal() {
       takeProfit: '',
       type: 'LONG',
       lotSize: '',
-      reason: ''
+      profit: '',
+      reason: '',
+      screenshot: null
     });
     setShowForm(false);
   };
@@ -250,6 +265,25 @@ function TradingJournal() {
                 <label style={{ display: 'block', fontSize: '12px', color: '#888', marginBottom: '4px' }}>Lot Size</label>
                 <input type="number" step="0.01" placeholder="0.5" value={formData.lotSize} onChange={(e) => setFormData({...formData, lotSize: e.target.value})} style={inputStyle} />
               </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: '#888', marginBottom: '4px' }}>Profit/Loss ($)</label>
+                <input type="number" step="0.01" placeholder="50.00" value={formData.profit} onChange={(e) => setFormData({...formData, profit: e.target.value})} style={inputStyle} required />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#888', marginBottom: '4px' }}>Trade Screenshot</label>
+              <input 
+                type="file" 
+                accept="image/*"
+                onChange={handleScreenshot}
+                style={{...inputStyle, padding: '6px'}}
+              />
+              {formData.screenshot && (
+                <div style={{ marginTop: '8px', fontSize: '12px', color: '#4ade80' }}>
+                  ✅ Screenshot selected
+                </div>
+              )}
             </div>
 
             <div>
@@ -296,6 +330,7 @@ function TradingJournal() {
                   <th style={{ padding: '12px', textAlign: 'left', color: '#888', fontWeight: '500' }}>Pips</th>
                   <th style={{ padding: '12px', textAlign: 'left', color: '#888', fontWeight: '500' }}>Profit</th>
                   <th style={{ padding: '12px', textAlign: 'left', color: '#888', fontWeight: '500' }}>ROI %</th>
+                  <th style={{ padding: '12px', textAlign: 'left', color: '#888', fontWeight: '500' }}>Screenshot</th>
                   <th style={{ padding: '12px', textAlign: 'left', color: '#888', fontWeight: '500' }}>Action</th>
                 </tr>
               </thead>
@@ -311,6 +346,26 @@ function TradingJournal() {
                       ${trade.profit.toFixed(2)}
                     </td>
                     <td style={{ padding: '12px', color: trade.roi >= 0 ? '#4ade80' : '#ef4444' }}>{trade.roi.toFixed(2)}%</td>
+                    <td style={{ padding: '12px' }}>
+                      {trade.screenshot ? (
+                        <button 
+                          onClick={() => setSelectedTrade(selectedTrade?.id === trade.id ? null : trade)}
+                          style={{
+                            background: '#3b82f6',
+                            color: '#fff',
+                            border: 'none',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                        >
+                          View
+                        </button>
+                      ) : (
+                        <span style={{ color: '#666' }}>-</span>
+                      )}
+                    </td>
                     <td style={{ padding: '12px' }}>
                       <button 
                         onClick={() => deleteTrade(trade.id)}
@@ -331,6 +386,56 @@ function TradingJournal() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Screenshot Modal */}
+      {selectedTrade && selectedTrade.screenshot && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: '#111827',
+            border: '1px solid #1f2937',
+            borderRadius: '8px',
+            padding: '1rem',
+            maxWidth: '90vw',
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, color: '#e0e0e0' }}>Trade Screenshot - {selectedTrade.date}</h3>
+              <button 
+                onClick={() => setSelectedTrade(null)}
+                style={{
+                  background: '#ef4444',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '4px 12px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                Close
+              </button>
+            </div>
+            <img 
+              src={selectedTrade.screenshot} 
+              style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: '4px' }}
+              alt="Trade screenshot"
+            />
           </div>
         </div>
       )}
