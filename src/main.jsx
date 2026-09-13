@@ -25,7 +25,13 @@ function TradingJournal() {
   // Load trades from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('xauusdTrades');
-    if (saved) setTrades(JSON.parse(saved));
+    if (saved) {
+      try {
+        setTrades(JSON.parse(saved));
+      } catch (e) {
+        console.error('Error loading trades:', e);
+      }
+    }
   }, []);
 
   // Save trades to localStorage
@@ -155,14 +161,15 @@ function TradingJournal() {
   const getDayColor = (dateStr) => {
     if (!dateStr) return '#1f2937';
     const total = dailyTotals[dateStr];
-    if (!total) return '#0f172a';
+    if (total === undefined || total === 0) return '#0f172a';
     if (total > 0) return '#10b981';
     return '#ef4444';
   };
 
   const getDayTextColor = (dateStr) => {
     if (!dateStr) return '#666';
-    if (!dailyTotals[dateStr]) return '#e0e0e0';
+    const total = dailyTotals[dateStr];
+    if (total === undefined || total === 0) return '#e0e0e0';
     return '#fff';
   };
 
@@ -294,7 +301,7 @@ function TradingJournal() {
                 }}>
                   {dayObj.day}
                 </div>
-                {dailyTotal !== null && (
+                {dailyTotal !== null && dailyTotal !== undefined && (
                   <div style={{
                     fontSize: '11px',
                     fontWeight: '600',
