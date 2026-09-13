@@ -6,6 +6,7 @@ function TradingJournal() {
   const [trades, setTrades] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     entryTime: '00:00',
@@ -106,6 +107,76 @@ function TradingJournal() {
     };
   });
 
+  // Get daily totals for calendar
+  const getDailyTotals = () => {
+    const daily = {};
+    trades.forEach(trade => {
+      if (daily[trade.date]) {
+        daily[trade.date] += trade.profit;
+      } else {
+        daily[trade.date] = trade.profit;
+      }
+    });
+    return daily;
+  };
+
+  const dailyTotals = getDailyTotals();
+
+  // Calendar rendering
+  const renderCalendar = () => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    const days = [];
+    
+    // Previous month days
+    for (let i = firstDay - 1; i >= 0; i--) {
+      days.push({ date: null, day: daysInPrevMonth - i, isCurrentMonth: false });
+    }
+
+    // Current month days
+    for (let i = 1; i <= daysInMonth; i++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+      days.push({ date: dateStr, day: i, isCurrentMonth: true });
+    }
+
+    // Next month days
+    const remainingDays = 42 - days.length;
+    for (let i = 1; i <= remainingDays; i++) {
+      days.push({ date: null, day: i, isCurrentMonth: false });
+    }
+
+    return days;
+  };
+
+  const getDayColor = (dateStr) => {
+    if (!dateStr) return '#1f2937';
+    const total = dailyTotals[dateStr];
+    if (!total) return '#0f172a';
+    if (total > 0) return '#10b981';
+    return '#ef4444';
+  };
+
+  const getDayTextColor = (dateStr) => {
+    if (!dateStr) return '#666';
+    if (!dailyTotals[dateStr]) return '#e0e0e0';
+    return '#fff';
+  };
+
+  const calendarDays = renderCalendar();
+  const monthName = currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  const prevMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
+  };
+
+  const nextMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
+  };
+
   return (
     <div style={{ 
       background: '#0a0e27', 
@@ -132,6 +203,127 @@ function TradingJournal() {
         <KPICard label="Winrate" value={`${stats.winrate}%`} color={stats.winrate >= 50 ? '#4ade80' : '#ef4444'} />
         <KPICard label="Total Profit" value={`$${stats.totalProfit.toFixed(2)}`} color={stats.totalProfit >= 0 ? '#4ade80' : '#ef4444'} />
         <KPICard label="Avg Profit" value={`$${stats.avgProfit.toFixed(2)}`} color={stats.avgProfit >= 0 ? '#4ade80' : '#ef4444'} />
+      </div>
+
+      {/* Calendar */}
+      <div style={{ background: '#111827', border: '1px solid #1f2937', borderRadius: '8px', padding: '1.5rem', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <button 
+            onClick={prevMonth}
+            style={{
+              background: '#1f2937',
+              color: '#e0e0e0',
+              border: 'none',
+              padding: '8px 12px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            ← Prev
+          </button>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#e0e0e0' }}>{monthName}</h2>
+          <button 
+            onClick={nextMonth}
+            style={{
+              background: '#1f2937',
+              color: '#e0e0e0',
+              border: 'none',
+              padding: '8px 12px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            Next →
+          </button>
+        </div>
+
+        {/* Day names */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(7, 1fr)', 
+          gap: '8px',
+          marginBottom: '8px'
+        }}>
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} style={{ 
+              textAlign: 'center', 
+              fontSize: '12px', 
+              fontWeight: '600',
+              color: '#888',
+              padding: '8px'
+            }}>
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar grid */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(7, 1fr)', 
+          gap: '8px'
+        }}>
+          {calendarDays.map((dayObj, idx) => {
+            const bgColor = getDayColor(dayObj.date);
+            const textColor = getDayTextColor(dayObj.date);
+            const dailyTotal = dayObj.date ? dailyTotals[dayObj.date] : null;
+
+            return (
+              <div
+                key={idx}
+                style={{
+                  background: bgColor,
+                  border: '1px solid #1f2937',
+                  borderRadius: '6px',
+                  padding: '8px',
+                  minHeight: '80px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'flex-start',
+                  opacity: dayObj.isCurrentMonth ? 1 : 0.4,
+                  cursor: dayObj.date ? 'pointer' : 'default'
+                }}
+              >
+                <div style={{ 
+                  fontSize: '12px', 
+                  fontWeight: '600',
+                  color: textColor,
+                  marginBottom: '4px'
+                }}>
+                  {dayObj.day}
+                </div>
+                {dailyTotal !== null && (
+                  <div style={{
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    color: textColor,
+                    wordBreak: 'break-word'
+                  }}>
+                    ${dailyTotal > 0 ? '+' : ''}{dailyTotal.toFixed(2)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Legend */}
+        <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ width: '20px', height: '20px', background: '#10b981', borderRadius: '4px' }}></div>
+            <span style={{ color: '#888' }}>Profit Day</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ width: '20px', height: '20px', background: '#ef4444', borderRadius: '4px' }}></div>
+            <span style={{ color: '#888' }}>Loss Day</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ width: '20px', height: '20px', background: '#0f172a', borderRadius: '4px' }}></div>
+            <span style={{ color: '#888' }}>No Trades</span>
+          </div>
+        </div>
       </div>
 
       {/* Charts */}
